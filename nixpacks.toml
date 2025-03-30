@@ -1,0 +1,16 @@
+[phases.setup]
+nixPkgs = ["nodejs"]
+
+[phases.install]
+cmds = ["npm install"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm run start"
+
+[variables]
+NODE_ENV = "production"
+DATA_DIR = "/data"
+TZ = "UTC"  # Ensure consistent timezone for cron jobs 
