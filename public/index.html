@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Xposter Control</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: system-ui;
+        }
+        button {
+            padding: 20px 40px;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        #status {
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <button onclick="triggerBot()">Post Now</button>
+        <div id="status"></div>
+    </div>
+    <script>
+        async function triggerBot() {
+            const button = document.querySelector('button');
+            const status = document.getElementById('status');
+            
+            button.disabled = true;
+            status.textContent = 'Posting...';
+            
+            try {
+                const response = await fetch('/trigger', { method: 'POST' });
+                const data = await response.json();
+                status.textContent = data.success ? 'Posted successfully!' : `Error: ${data.error}`;
+            } catch (error) {
+                status.textContent = 'Error: Failed to trigger bot';
+            } finally {
+                button.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html> 

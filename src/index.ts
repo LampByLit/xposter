@@ -35,10 +35,7 @@ async function serveFile(res: http.ServerResponse, filePath: string, contentType
 
 async function main() {
   try {
-    logger.info('Starting Xposter service...', { 
-      nodeEnv: process.env.NODE_ENV,
-      timezone: process.env.TZ
-    });
+    logger.info('Starting Xposter service...');
 
     // Validate environment variables
     if (!xConfig.apiKey || !xConfig.apiKeySecret || !xConfig.accessToken || !xConfig.accessTokenSecret) {
@@ -48,24 +45,50 @@ async function main() {
     // Initialize X API client
     const xClient = new XApiClient(xConfig);
 
-    // Initialize and start Article1Poster bot
-    const schedule = process.env.ARTICLE1_SCHEDULE || '0 0 * * *'; // Every day at midnight UTC
+    // Initialize Article1Poster bot
+    const schedule = process.env.ARTICLE1_SCHEDULE || '0 0 * * *';
     const article1Bot = new Article1Poster(xClient, schedule);
     await article1Bot.start();
 
-    // Create health check server
+    // Create server
     const server = http.createServer(async (req, res) => {
-      if (req.url === '/health') {
+      // Enable CORS
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+      if (req.method === 'OPTIONS') {
+        res.writeHead(200);
+        res.end();
+        return;
+      }
+
+      if (req.url === '/') {
+        // Serve the main page
+        await serveFile(res, path.join(PUBLIC_DIR, 'index.html'), 'text/html');
+      } else if (req.url === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
           status: 'ok',
-          timestamp: new Date().toISOString(),
-          timezone: process.env.TZ,
-          nodeEnv: process.env.NODE_ENV
+          timestamp: new Date().toISOString()
         }));
       } else if (req.url === '/latest') {
         // Serve the latest post page
         await serveFile(res, path.join(PUBLIC_DIR, 'latest-post.html'), 'text/html');
+      } else if (req.url === '/trigger' && req.method === 'POST') {
+        try {
+          // Trigger the bot manually
+          await article1Bot['postArticle']();
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        } catch (error) {
+          logger.error('Error triggering bot', { error });
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+          }));
+        }
       } else {
         res.writeHead(404);
         res.end();
@@ -80,8 +103,8 @@ async function main() {
     });
 
     logger.info('Xposter service started successfully', {
-      schedule,
-      port: PORT
+      port: PORT,
+      schedule
     });
 
     // Handle graceful shutdown
