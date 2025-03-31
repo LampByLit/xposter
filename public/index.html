@@ -10,39 +10,87 @@
             height: 100vh;
             margin: 0;
             font-family: system-ui;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
         }
         button {
-            padding: 20px 40px;
-            font-size: 18px;
+            padding: 15px 30px;
+            font-size: 16px;
             cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            background: #0070f3;
+            color: white;
+            transition: background 0.2s;
         }
-        #status {
-            margin-top: 20px;
+        button:hover {
+            background: #0051cc;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 4px;
             text-align: center;
+        }
+        .status.success {
+            background: #e6ffe6;
+            color: #006700;
+        }
+        .status.error {
+            background: #ffe6e6;
+            color: #670000;
         }
     </style>
 </head>
 <body>
-    <div>
-        <button onclick="triggerBot()">Post Now</button>
-        <div id="status"></div>
+    <div class="container">
+        <div class="button-group">
+            <button onclick="triggerBot('article1')">Run Article1 Bot</button>
+            <button onclick="triggerBot('xpara')">Run Xpara Bot</button>
+        </div>
+        <div id="status" class="status"></div>
     </div>
     <script>
-        async function triggerBot() {
-            const button = document.querySelector('button');
+        async function triggerBot(botType) {
+            const buttons = document.querySelectorAll('button');
             const status = document.getElementById('status');
             
-            button.disabled = true;
-            status.textContent = 'Posting...';
+            // Disable all buttons during operation
+            buttons.forEach(btn => btn.disabled = true);
+            
+            status.className = 'status';
+            status.textContent = `Running ${botType} bot...`;
             
             try {
-                const response = await fetch('/trigger', { method: 'POST' });
+                const response = await fetch(`/trigger/${botType}`, { method: 'POST' });
                 const data = await response.json();
-                status.textContent = data.success ? 'Posted successfully!' : `Error: ${data.error}`;
+                
+                if (data.success) {
+                    status.className = 'status success';
+                    status.textContent = `${botType} bot ran successfully!`;
+                } else {
+                    status.className = 'status error';
+                    status.textContent = `Error running ${botType} bot: ${data.error}`;
+                }
             } catch (error) {
-                status.textContent = 'Error: Failed to trigger bot';
+                status.className = 'status error';
+                status.textContent = `Failed to trigger ${botType} bot: ${error.message}`;
             } finally {
-                button.disabled = false;
+                buttons.forEach(btn => btn.disabled = false);
             }
         }
     </script>

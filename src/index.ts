@@ -6,6 +6,7 @@ import { createBotLogger } from './shared/logging';
 import { XApiClient } from './shared/x-api/client';
 import { XConfig } from './shared/types';
 import { Article1Poster } from './bots/article1';
+import { XparaBot } from './bots/xpara';
 
 // Load environment variables
 dotenv.config();
@@ -46,9 +47,14 @@ async function main() {
     const xClient = new XApiClient(xConfig);
 
     // Initialize Article1Poster bot
-    const schedule = process.env.ARTICLE1_SCHEDULE || '0 0 * * *';
-    const article1Bot = new Article1Poster(xClient, schedule);
+    const article1Schedule = process.env.ARTICLE1_SCHEDULE || '0 0 * * *';
+    const article1Bot = new Article1Poster(xClient, article1Schedule);
     await article1Bot.start();
+
+    // Initialize XparaBot
+    const xparaSchedule = process.env.XPARA_SCHEDULE || '30 11 * * *';  // 11:30 UTC daily
+    const xparaBot = new XparaBot(xClient, xparaSchedule);
+    await xparaBot.start();
 
     // Create server
     const server = http.createServer(async (req, res) => {
@@ -75,14 +81,28 @@ async function main() {
       } else if (req.url === '/latest') {
         // Serve the latest post page
         await serveFile(res, path.join(PUBLIC_DIR, 'latest-post.html'), 'text/html');
-      } else if (req.url === '/trigger' && req.method === 'POST') {
+      } else if (req.url === '/trigger/article1' && req.method === 'POST') {
         try {
-          // Trigger the bot manually
+          // Trigger article1 bot manually
           await article1Bot['postArticle']();
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true }));
         } catch (error) {
-          logger.error('Error triggering bot', { error });
+          logger.error('Error triggering article1 bot', { error });
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+          }));
+        }
+      } else if (req.url === '/trigger/xpara' && req.method === 'POST') {
+        try {
+          // Trigger xpara bot manually
+          await xparaBot['processAndPost']();
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        } catch (error) {
+          logger.error('Error triggering xpara bot', { error });
           res.writeHead(500, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ 
             success: false, 
@@ -104,13 +124,15 @@ async function main() {
 
     logger.info('Xposter service started successfully', {
       port: PORT,
-      schedule
+      article1Schedule,
+      xparaSchedule
     });
 
     // Handle graceful shutdown
     const shutdown = async () => {
       logger.info('Shutting down...');
       await article1Bot.stop();
+      await xparaBot.stop();
       server.close();
       process.exit(0);
     };
