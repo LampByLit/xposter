@@ -52,7 +52,7 @@ async function main() {
     await article1Bot.start();
 
     // Initialize XparaBot
-    const xparaSchedule = process.env.XPARA_SCHEDULE || '30 11 * * *';  // 11:30 UTC daily
+    const xparaSchedule = process.env.XPARA_SCHEDULE || '0 12 * * *';  // 12:00 UTC daily
     const xparaBot = new XparaBot(xClient, xparaSchedule);
     await xparaBot.start();
 
