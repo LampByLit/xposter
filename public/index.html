@@ -37,12 +37,13 @@
             flex: 1;
             max-width: 200px;
         }
-        button:hover {
+        button:hover:not(:disabled) {
             background: #0051cc;
         }
         button:disabled {
             background: #ccc;
             cursor: not-allowed;
+            opacity: 0.7;
         }
         .status {
             margin-top: 1rem;
@@ -62,10 +63,19 @@
             background: #ffe6e6;
             color: #670000;
         }
+        .status.warning {
+            background: #fff3e6;
+            color: #804d00;
+        }
         .title {
             text-align: center;
             margin-bottom: 2rem;
             color: #333;
+        }
+        .error-details {
+            margin-top: 0.5rem;
+            font-size: 0.9em;
+            opacity: 0.8;
         }
     </style>
 </head>
@@ -79,6 +89,21 @@
         <div id="status" class="status"></div>
     </div>
     <script>
+        function formatErrorMessage(error, botType) {
+            if (error.includes('429')) {
+                return {
+                    message: `Rate limit exceeded for ${botType === 'article1' ? '/pol/' : '/x/'} bot`,
+                    details: 'Twitter allows only 17 tweets per day. Please try again tomorrow.',
+                    class: 'warning'
+                };
+            }
+            return {
+                message: `Failed to trigger ${botType === 'article1' ? '/pol/' : '/x/'} bot: ${error}`,
+                details: null,
+                class: 'error'
+            };
+        }
+
         async function triggerBot(botType) {
             const buttons = document.querySelectorAll('button');
             const status = document.getElementById('status');
@@ -99,33 +124,37 @@
                     }
                 });
                 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
                 const data = await response.json();
                 
                 if (data.success) {
                     status.className = 'status visible success';
                     status.textContent = `${botType === 'article1' ? '/pol/' : '/x/'} bot ran successfully!`;
                 } else {
-                    status.className = 'status visible error';
-                    status.textContent = `Error running ${botType === 'article1' ? '/pol/' : '/x/'} bot: ${data.error || 'Unknown error'}`;
+                    const error = formatErrorMessage(data.error || 'Unknown error', botType);
+                    status.className = `status visible ${error.class}`;
+                    status.innerHTML = error.message;
+                    if (error.details) {
+                        status.innerHTML += `<div class="error-details">${error.details}</div>`;
+                    }
                 }
             } catch (error) {
-                status.className = 'status visible error';
-                status.textContent = `Failed to trigger ${botType === 'article1' ? '/pol/' : '/x/'} bot: ${error.message}`;
+                const formattedError = formatErrorMessage(error.message, botType);
+                status.className = `status visible ${formattedError.class}`;
+                status.innerHTML = formattedError.message;
+                if (formattedError.details) {
+                    status.innerHTML += `<div class="error-details">${formattedError.details}</div>`;
+                }
                 console.error('Error:', error);
             } finally {
                 // Re-enable buttons after operation
                 buttons.forEach(btn => btn.disabled = false);
                 
-                // Clear status after 5 seconds
-                setTimeout(() => {
-                    if (status.className.includes('success')) {
+                // Clear success messages after 5 seconds
+                if (status.className.includes('success')) {
+                    setTimeout(() => {
                         status.className = 'status';
-                    }
-                }, 5000);
+                    }, 5000);
+                }
             }
         }
     </script>
