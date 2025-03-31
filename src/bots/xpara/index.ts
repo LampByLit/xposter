@@ -6,7 +6,7 @@ import { XparaApiResponse, XparaArticle } from './types';
 import path from 'path';
 import fs from 'fs/promises';
 import { getDataPath } from '../../utils/paths';
-import { writeLatestPost } from '../../shared/utils/latest-post';
+import { writeXparaLatestPost } from '../../shared/utils/xpara-latest-post';
 
 export class XparaBot implements BaseBot {
   name = 'xpara';
@@ -160,7 +160,7 @@ export class XparaBot implements BaseBot {
         });
 
         // Write latest post info
-        await writeLatestPost({
+        await writeXparaLatestPost({
           tweetId: result.tweetId,
           threadId: parseInt(selectedArticle.threadId, 10),
           timestamp: new Date().toISOString()

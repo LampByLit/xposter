@@ -81,6 +81,9 @@ async function main() {
       } else if (req.url === '/latest') {
         // Serve the latest post page
         await serveFile(res, path.join(PUBLIC_DIR, 'latest-post.html'), 'text/html');
+      } else if (req.url === '/latest/xpara') {
+        // Serve the xpara latest post page
+        await serveFile(res, path.join(PUBLIC_DIR, 'xpara-latest-post.html'), 'text/html');
       } else if (req.url === '/trigger/article1' && req.method === 'POST') {
         try {
           // Trigger article1 bot manually
