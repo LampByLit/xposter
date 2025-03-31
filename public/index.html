@@ -17,11 +17,13 @@
             padding: 2rem;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            min-width: 400px;
         }
         .button-group {
             display: flex;
             gap: 1rem;
             margin-bottom: 1rem;
+            justify-content: center;
         }
         button {
             padding: 15px 30px;
@@ -32,6 +34,8 @@
             background: #0070f3;
             color: white;
             transition: background 0.2s;
+            flex: 1;
+            max-width: 200px;
         }
         button:hover {
             background: #0051cc;
@@ -45,6 +49,10 @@
             padding: 1rem;
             border-radius: 4px;
             text-align: center;
+            display: none;
+        }
+        .status.visible {
+            display: block;
         }
         .status.success {
             background: #e6ffe6;
@@ -54,13 +62,19 @@
             background: #ffe6e6;
             color: #670000;
         }
+        .title {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: #333;
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <h1 class="title">Xposter Control</h1>
         <div class="button-group">
-            <button onclick="triggerBot('article1')">Run Article1 Bot</button>
-            <button onclick="triggerBot('xpara')">Run Xpara Bot</button>
+            <button onclick="triggerBot('article1')" id="article1-btn">Run /pol/ Bot</button>
+            <button onclick="triggerBot('xpara')" id="xpara-btn">Run /x/ Bot</button>
         </div>
         <div id="status" class="status"></div>
     </div>
@@ -68,29 +82,50 @@
         async function triggerBot(botType) {
             const buttons = document.querySelectorAll('button');
             const status = document.getElementById('status');
+            const currentButton = document.getElementById(`${botType}-btn`);
             
             // Disable all buttons during operation
             buttons.forEach(btn => btn.disabled = true);
             
-            status.className = 'status';
-            status.textContent = `Running ${botType} bot...`;
+            // Show status with loading message
+            status.className = 'status visible';
+            status.textContent = `Running ${botType === 'article1' ? '/pol/' : '/x/'} bot...`;
             
             try {
-                const response = await fetch(`/trigger/${botType}`, { method: 'POST' });
+                const response = await fetch(`/trigger/${botType}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const data = await response.json();
                 
                 if (data.success) {
-                    status.className = 'status success';
-                    status.textContent = `${botType} bot ran successfully!`;
+                    status.className = 'status visible success';
+                    status.textContent = `${botType === 'article1' ? '/pol/' : '/x/'} bot ran successfully!`;
                 } else {
-                    status.className = 'status error';
-                    status.textContent = `Error running ${botType} bot: ${data.error}`;
+                    status.className = 'status visible error';
+                    status.textContent = `Error running ${botType === 'article1' ? '/pol/' : '/x/'} bot: ${data.error || 'Unknown error'}`;
                 }
             } catch (error) {
-                status.className = 'status error';
-                status.textContent = `Failed to trigger ${botType} bot: ${error.message}`;
+                status.className = 'status visible error';
+                status.textContent = `Failed to trigger ${botType === 'article1' ? '/pol/' : '/x/'} bot: ${error.message}`;
+                console.error('Error:', error);
             } finally {
+                // Re-enable buttons after operation
                 buttons.forEach(btn => btn.disabled = false);
+                
+                // Clear status after 5 seconds
+                setTimeout(() => {
+                    if (status.className.includes('success')) {
+                        status.className = 'status';
+                    }
+                }, 5000);
             }
         }
     </script>
