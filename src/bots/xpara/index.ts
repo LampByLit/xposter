@@ -92,7 +92,7 @@ export class XparaBot implements BaseBot {
   }
 
   private get4PlebsUrl(threadId: string): string {
-    return `https://archive.4plebs.org/pol/thread/${threadId}`;
+    return `https://archive.4plebs.org/x/thread/${threadId}`;
   }
 
   private formatTweet(article: XparaArticle): string {
