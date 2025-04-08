@@ -8,9 +8,15 @@ export function get4PlebsUrl(threadId: number): string {
   return `https://archive.4plebs.org/pol/thread/${threadId}`;
 }
 
-// Filter articles by total posts
+// Filter articles by total posts and age
 export function filterArticlesByPosts(articles: Article[], maxPosts: number): Article[] {
-  return articles.filter(article => article.metadata.totalPosts < maxPosts);
+  const MAX_AGE_HOURS = 24; // Only consider articles from last 24 hours
+  const cutoffTime = Date.now() - (MAX_AGE_HOURS * 60 * 60 * 1000);
+  
+  return articles.filter(article => 
+    article.metadata.totalPosts < maxPosts && 
+    article.metadata.generatedAt > cutoffTime
+  );
 }
 
 // Select a random article from an array
