@@ -1,5 +1,5 @@
 export interface Article {
-  threadId: number;
+  threadId: string;
   headline: string;
   article: string;
   antisemiticStats: {

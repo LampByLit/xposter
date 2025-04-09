@@ -11,7 +11,16 @@ import { XparaBot } from './bots/xpara';
 // Load environment variables
 dotenv.config();
 
+// Create logger
 const logger = createBotLogger('main');
+
+// Log environment variables for debugging
+logger.info('Environment variables loaded', {
+  articleSourceUrl: process.env.ARTICLE_SOURCE_URL,
+  port: process.env.PORT,
+  logLevel: process.env.LOG_LEVEL
+});
+
 const PORT = process.env.PORT || 8080;
 const PUBLIC_DIR = path.resolve(process.cwd(), 'public');
 
@@ -87,9 +96,23 @@ async function main() {
       } else if (req.url === '/trigger/article1' && req.method === 'POST') {
         try {
           // Trigger article1 bot manually
-          await article1Bot['postArticle']();
+          await article1Bot.processAndPost();
+          
+          // Check if latest post was updated
+          const latestPostPath = path.join(PUBLIC_DIR, 'latest-post.html');
+          let latestPostContent = '';
+          
+          try {
+            latestPostContent = await fs.readFile(latestPostPath, 'utf-8');
+          } catch (readError) {
+            logger.warn('Could not read latest post file', { error: readError });
+          }
+          
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: true }));
+          res.end(JSON.stringify({ 
+            success: true,
+            latestPost: latestPostContent || 'No latest post found'
+          }));
         } catch (error) {
           logger.error('Error triggering article1 bot', { error });
           res.writeHead(500, { 'Content-Type': 'application/json' });

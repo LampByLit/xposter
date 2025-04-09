@@ -28,7 +28,7 @@ export function selectRandomArticle(articles: Article[]): Article | null {
 
 // Format article text to fit in a tweet
 export function formatTweet(article: Article): string {
-  const url = get4PlebsUrl(article.threadId);
+  const url = get4PlebsUrl(parseInt(article.threadId, 10));
   const hashtag = '#4chan';
   const newlines = '\n\n';
   const space = ' ';

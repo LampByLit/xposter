@@ -4,8 +4,11 @@ import { BaseBot } from '../../shared/types';
 import { XApiClient } from '../../shared/x-api/client';
 import { createBotLogger } from '../../shared/logging';
 import { Article, ArticlesResponse } from './types';
-import { filterArticlesByPosts, selectRandomArticle, formatTweet } from './utils';
+import { selectRandomArticle, formatTweet } from './utils';
 import { writeLatestPost } from '../../shared/utils/latest-post';
+import path from 'path';
+import fs from 'fs/promises';
+import { getDataPath } from '../../utils/paths';
 
 export class Article1Poster implements BaseBot {
   name = 'article1';
@@ -14,19 +17,25 @@ export class Article1Poster implements BaseBot {
   private logger = createBotLogger('article1');
   private xClient: XApiClient;
   private articleSourceUrl: string;
+  private lastProcessedTime: number = 0;
+  private dataPath: string;
 
   constructor(xClient: XApiClient, schedule: string) {
     this.xClient = xClient;
     this.schedule = schedule;
-    this.articleSourceUrl = process.env.ARTICLE_SOURCE_URL || 'https://pol-ai-production.up.railway.app/articles';
+    this.logger.info('Environment variable value', { envUrl: process.env.ARTICLE_SOURCE_URL });
+    this.articleSourceUrl = 'https://pol-ai-production.up.railway.app/api/articles';
+    this.logger.info('Final URL value', { url: this.articleSourceUrl });
+    this.dataPath = path.resolve(getDataPath(), 'article1');
   }
 
   async start(): Promise<void> {
     this.logger.info('Starting Article1Poster bot');
+    await this.initializeDataDirectory();
     
     this.cronJob = new CronJob(
       this.schedule,
-      () => this.postArticle(),
+      () => this.processAndPost(),
       null,
       true
     );
@@ -37,133 +46,83 @@ export class Article1Poster implements BaseBot {
     this.cronJob?.stop();
   }
 
-  private decodeHtmlEntities(text: string): string {
-    const entities: { [key: string]: string } = {
-      '&quot;': '"',
-      '&amp;': '&',
-      '&lt;': '<',
-      '&gt;': '>',
-      '&#39;': "'",
-      '&apos;': "'",
-    };
-    return text.replace(/&quot;|&amp;|&lt;|&gt;|&#39;|&apos;/g, match => entities[match]);
+  private async initializeDataDirectory() {
+    try {
+      await fs.mkdir(this.dataPath, { recursive: true });
+    } catch (error) {
+      this.logger.error('Failed to create data directory', { 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        path: this.dataPath
+      });
+      throw error;
+    }
   }
 
-  private findJsonBoundaries(text: string): { start: number; end: number } | null {
-    let start = -1;
-    let end = -1;
-    let braceCount = 0;
-    let inString = false;
-    let escaped = false;
-
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-
-      if (inString) {
-        if (char === '\\' && !escaped) {
-          escaped = true;
-          continue;
-        }
-        if (char === '"' && !escaped) {
-          inString = false;
-        }
-        escaped = false;
-        continue;
-      }
-
-      if (char === '"') {
-        inString = true;
-        continue;
-      }
-
-      if (char === '{') {
-        if (braceCount === 0) {
-          start = i;
-        }
-        braceCount++;
-      } else if (char === '}') {
-        braceCount--;
-        if (braceCount === 0) {
-          end = i + 1;
-          // Found complete JSON object
-          break;
-        }
-      }
+  private async loadLastProcessedTime(): Promise<number> {
+    try {
+      const stateFile = path.resolve(this.dataPath, 'state.json');
+      const data = await fs.readFile(stateFile, 'utf-8');
+      const state = JSON.parse(data) as { lastProcessedTime: number };
+      return state.lastProcessedTime || 0;
+    } catch (error) {
+      this.logger.error('Error loading last processed time', { 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      return 0;
     }
+  }
 
-    if (start === -1 || end === -1 || braceCount !== 0) {
-      return null;
-    }
-
-    return { start, end };
+  private async saveLastProcessedTime(time: number): Promise<void> {
+    const stateFile = path.resolve(this.dataPath, 'state.json');
+    await fs.writeFile(stateFile, JSON.stringify({ lastProcessedTime: time }));
   }
 
   private async fetchArticles(): Promise<Article[]> {
     try {
       this.logger.debug(`Fetching articles from ${this.articleSourceUrl}`);
+      const response = await fetch(this.articleSourceUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'XPoster/1.0'
+        }
+      });
       
-      const response = await fetch(this.articleSourceUrl);
       if (!response.ok) {
-        throw new Error(`Failed to fetch articles: ${response.status}`);
-      }
-
-      // Get the HTML content
-      const htmlContent = await response.text();
-      this.logger.debug(`Received HTML content length: ${htmlContent.length}`);
-
-      // Find proper JSON boundaries
-      const boundaries = this.findJsonBoundaries(htmlContent);
-      if (!boundaries) {
-        throw new Error('Could not find valid JSON content in HTML');
+        throw new Error(`Failed to fetch articles: ${response.statusText}`);
       }
       
-      this.logger.debug(`JSON content bounds: ${boundaries.start} to ${boundaries.end}`);
-      
-      let jsonContent = htmlContent.slice(boundaries.start, boundaries.end);
-      
-      // Decode HTML entities
-      jsonContent = this.decodeHtmlEntities(jsonContent);
-      
-      this.logger.debug(`Extracted JSON content length: ${jsonContent.length}`);
-      this.logger.debug(`JSON content preview: ${jsonContent.substring(0, 200)}...`);
-      
-      try {
-        const data: ArticlesResponse = JSON.parse(jsonContent);
-        this.logger.debug(`Successfully parsed JSON, found ${data.articles.length} articles`);
-        return data.articles;
-      } catch (parseError) {
-        this.logger.error('JSON parse error', { parseError, jsonPreview: jsonContent.substring(0, 500) });
-        throw new Error(`Failed to parse JSON content: ${parseError}`);
-      }
-
+      const data = await response.json() as ArticlesResponse;
+      this.logger.debug(`Successfully fetched ${data.articles.length} articles`);
+      return data.articles;
     } catch (error) {
       this.logger.error('Error fetching articles', { 
-        error,
-        url: this.articleSourceUrl,
-        errorMessage: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       return [];
     }
   }
 
-  private async postArticle(): Promise<void> {
+  async processAndPost(): Promise<void> {
     try {
-      // Fetch and filter articles
+      this.lastProcessedTime = await this.loadLastProcessedTime();
       const articles = await this.fetchArticles();
-      const eligibleArticles = filterArticlesByPosts(articles, 200);
-      
-      // Select random article
-      const selectedArticle = selectRandomArticle(eligibleArticles);
+      const newArticles = articles.filter(a => a.metadata.generatedAt > this.lastProcessedTime);
+
+      this.logger.info(`Found ${newArticles.length} new articles to process`);
+
+      // Select one random article to post
+      const selectedArticle = selectRandomArticle(newArticles);
       if (!selectedArticle) {
-        this.logger.warn('No eligible articles found');
+        this.logger.warn('No new articles to post');
         return;
       }
 
-      // Format and post tweet
       const tweet = formatTweet(selectedArticle);
       const result = await this.xClient.post(tweet);
-
-      if (result.success) {
+      
+      if (result.success && result.tweetId) {
         this.logger.info('Successfully posted article', {
           threadId: selectedArticle.threadId,
           tweetId: result.tweetId
@@ -171,10 +130,14 @@ export class Article1Poster implements BaseBot {
 
         // Write latest post info
         await writeLatestPost({
-          tweetId: result.tweetId!,
-          threadId: selectedArticle.threadId,
+          tweetId: result.tweetId,
+          threadId: parseInt(selectedArticle.threadId, 10),
           timestamp: new Date().toISOString()
         });
+        
+        // Update last processed time to the selected article's time
+        this.lastProcessedTime = selectedArticle.metadata.generatedAt;
+        await this.saveLastProcessedTime(this.lastProcessedTime);
       } else {
         this.logger.error('Failed to post article', {
           threadId: selectedArticle.threadId,
@@ -182,7 +145,9 @@ export class Article1Poster implements BaseBot {
         });
       }
     } catch (error) {
-      this.logger.error('Error in postArticle', { error });
+      this.logger.error('Error in processAndPost', { 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   }
 } 
