@@ -96,37 +96,12 @@ export class XparaBot implements BaseBot {
   }
 
   private formatTweet(article: XparaArticle): string {
-    const MAX_TWEET_LENGTH = 280;
     const url = this.get4PlebsUrl(article.threadId);
     const hashtag = '#4chan';
     const newlines = '\n\n';
     const space = ' ';
     
-    // Calculate exact space needed for fixed elements
-    const reservedLength = url.length + hashtag.length + newlines.length + space.length;
-    const maxTextLength = MAX_TWEET_LENGTH - reservedLength;
-    
-    let text = article.article;
-    
-    // Only truncate if necessary
-    if (text.length > maxTextLength) {
-      // Try to find a sentence break near the limit
-      let truncateIndex = text.lastIndexOf('. ', maxTextLength);
-      
-      // If no sentence break, try to find a word break
-      if (truncateIndex === -1 || truncateIndex < maxTextLength - 30) {
-        truncateIndex = text.lastIndexOf(' ', maxTextLength - 3);
-      }
-      
-      // If still no good break point, just cut at the limit
-      if (truncateIndex === -1 || truncateIndex < maxTextLength - 50) {
-        truncateIndex = maxTextLength - 3;
-      }
-      
-      text = text.substring(0, truncateIndex) + '...';
-    }
-    
-    return `${text}${newlines}${url} ${hashtag}`;
+    return `${article.article}${newlines}${url} ${hashtag}`;
   }
 
   private selectRandomArticle(articles: XparaArticle[]): XparaArticle | null {
