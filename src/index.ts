@@ -7,6 +7,7 @@ import { XApiClient } from './shared/x-api/client';
 import { XConfig } from './shared/types';
 import { Article1Poster } from './bots/article1';
 import { XparaBot } from './bots/xpara';
+import { LitBot } from './bots/lit';
 
 // Load environment variables
 dotenv.config();
@@ -65,6 +66,11 @@ async function main() {
     const xparaBot = new XparaBot(xClient, xparaSchedule);
     await xparaBot.start();
 
+    // Initialize LitBot
+    const litSchedule = process.env.LIT_SCHEDULE || '30 19 * * *';  // 19:30 UTC daily
+    const litBot = new LitBot(xClient, litSchedule);
+    await litBot.start();
+
     // Create server
     const server = http.createServer(async (req, res) => {
       // Enable CORS
@@ -93,6 +99,9 @@ async function main() {
       } else if (req.url === '/latest/xpara') {
         // Serve the xpara latest post page
         await serveFile(res, path.join(PUBLIC_DIR, 'xpara-latest-post.html'), 'text/html');
+      } else if (req.url === '/latest/lit') {
+        // Serve the lit latest post page
+        await serveFile(res, path.join(PUBLIC_DIR, 'lit-latest-post.html'), 'text/html');
       } else if (req.url === '/trigger/article1' && req.method === 'POST') {
         try {
           // Trigger article1 bot manually
@@ -135,6 +144,20 @@ async function main() {
             error: error instanceof Error ? error.message : 'Unknown error' 
           }));
         }
+      } else if (req.url === '/trigger/lit' && req.method === 'POST') {
+        try {
+          // Trigger lit bot manually
+          await litBot['processAndPost']();
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        } catch (error) {
+          logger.error('Error triggering lit bot', { error });
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+          }));
+        }
       } else {
         res.writeHead(404);
         res.end();
@@ -151,7 +174,8 @@ async function main() {
     logger.info('Xposter service started successfully', {
       port: PORT,
       article1Schedule,
-      xparaSchedule
+      xparaSchedule,
+      litSchedule
     });
 
     // Handle graceful shutdown
@@ -159,6 +183,7 @@ async function main() {
       logger.info('Shutting down...');
       await article1Bot.stop();
       await xparaBot.stop();
+      await litBot.stop();
       server.close();
       process.exit(0);
     };

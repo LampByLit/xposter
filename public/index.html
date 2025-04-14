@@ -85,6 +85,7 @@
         <div class="button-group">
             <button onclick="triggerBot('article1')" id="article1-btn">Run /pol/ Bot</button>
             <button onclick="triggerBot('xpara')" id="xpara-btn">Run /x/ Bot</button>
+            <button onclick="triggerBot('lit')" id="lit-btn">Run /lit/ Bot</button>
         </div>
         <div id="status" class="status"></div>
     </div>
@@ -92,13 +93,13 @@
         function formatErrorMessage(error, botType) {
             if (error.includes('429')) {
                 return {
-                    message: `Rate limit exceeded for ${botType === 'article1' ? '/pol/' : '/x/'} bot`,
+                    message: `Rate limit exceeded for ${botType === 'article1' ? '/pol/' : botType === 'xpara' ? '/x/' : '/lit/'} bot`,
                     details: 'Twitter allows only 17 tweets per day. Please try again tomorrow.',
                     class: 'warning'
                 };
             }
             return {
-                message: `Failed to trigger ${botType === 'article1' ? '/pol/' : '/x/'} bot: ${error}`,
+                message: `Failed to trigger ${botType === 'article1' ? '/pol/' : botType === 'xpara' ? '/x/' : '/lit/'} bot: ${error}`,
                 details: null,
                 class: 'error'
             };
@@ -114,7 +115,7 @@
             
             // Show status with loading message
             status.className = 'status visible';
-            status.textContent = `Running ${botType === 'article1' ? '/pol/' : '/x/'} bot...`;
+            status.textContent = `Running ${botType === 'article1' ? '/pol/' : botType === 'xpara' ? '/x/' : '/lit/'} bot...`;
             
             try {
                 const response = await fetch(`/trigger/${botType}`, {
@@ -128,7 +129,7 @@
                 
                 if (data.success) {
                     status.className = 'status visible success';
-                    status.textContent = `${botType === 'article1' ? '/pol/' : '/x/'} bot ran successfully!`;
+                    status.textContent = `${botType === 'article1' ? '/pol/' : botType === 'xpara' ? '/x/' : '/lit/'} bot ran successfully!`;
                 } else {
                     const error = formatErrorMessage(data.error || 'Unknown error', botType);
                     status.className = `status visible ${error.class}`;
