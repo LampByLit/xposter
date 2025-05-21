@@ -92,7 +92,7 @@ export class LitBot implements BaseBot {
   }
 
   private get4PlebsUrl(threadId: string): string {
-    return `https://archive.4plebs.org/lit/thread/${threadId}`;
+    return `https://warosu.org/lit/thread/${threadId}`;
   }
 
   private formatTweet(article: LitArticle): string {
